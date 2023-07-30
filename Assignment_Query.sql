@@ -176,7 +176,7 @@ INNER JOIN
 INNER JOIN
   Category ON Equipment.Category_ID = Category.Category_ID;
 
--- Select Member and Transaction (Wi Liaam)
+-- Select Member and Transaction (Wi Liam)
 Select Member.Member_ID, CONVERT (varchar, DecryptByAsymKey(AsymKey_ID('AsymKey1'),Member.[IC/Passport_No])) As [IC/Passport_No], 
 Member.[Name], Member.[Address], Member.[Member_Status], [Transaction].Transaction_Date, [Transaction].Transaction_ID
 from Member 
@@ -205,6 +205,7 @@ Category.Category_ID;
 
 --MEMBER USER LOGIN AND ROLE
 CREATE LOGIN [100] WITH PASSWORD = 'QwErTy12345!@#$%'
+CREATE LOGIN [104] WITH PASSWORD = 'QwErTy12345!@#$%'
 SELECT [LoginName], * FROM SysLogins WHERE [LoginName] = '100'
 
 USE [APU Sports Equipment]
@@ -242,5 +243,192 @@ CREATE ROLE [Management]
 ALTER ROLE [Management] ADD MEMBER [MG01]
 SELECT [name],* FROM sys.sysusers 
 
+DROP ROLE [Member]
+DROP ROLE [Store Clerk]
+DROP ROLE [Database Administrator]
+DROP ROLE [Management]
+
 ---------------------------- Permissions on User Roles ----------------------------
+use [APU Sports Equipment]
+
+--- User Management ---
+
+-- a. must be able to update their own membership details only
+GRANT SELECT, UPDATE ON [Member] TO [Member]
+
+-- b. must be able to check, add, update and delete their own transactions only 
+--Create View for Checking
+CREATE VIEW [Member Transaction Details View] AS
+SELECT [Transaction].Member_ID, [Transaction].Transaction_ID, [Transaction].Transaction_Date, 
+Transaction_Details.Transaction_Details_ID, Equipment.Equipment_ID, Equipment.Equipment_Name,
+Transaction_Details.Quantity, 
+([Transaction_Details].Quantity * 
+(Equipment.Unit_Price + (Equipment.Unit_Price * Country.Tax_Percentage)) * (1 - Category.Discounts)) AS Price_Payment
+FROM Transaction_Details
+INNER JOIN [Transaction] ON Transaction_Details.Transaction_ID = [Transaction].Transaction_ID
+INNER JOIN Equipment ON Transaction_Details.Equipment_ID = Equipment.Equipment_ID
+INNER JOIN Category ON Equipment.Category_ID = Category.Category_ID
+INNER JOIN Country ON Equipment.Country_ID = Country.Country_ID;
+
+
+GRANT SELECT ON [Member Transaction Details View] TO [Member]
+
+GRANT SELECT, INSERT, DELETE ON [Transaction_Details] TO [Member]
+
+GRANT UPDATE (Quantity) ON [Transaction_Details] TO [Member]
+
+
+--- Store Clerk ---
+
+-- a. must be able to manage (add, update, remove) all data except membership and transaction details
+GRANT INSERT, UPDATE, DELETE ON DATABASE:: [APU Sports Equipment] To [Store Clerk]
+
+DENY INSERT, UPDATE, DELETE ON [Transaction_Details] To [Store Clerk]
+
+DENY INSERT, UPDATE, DELETE ON [Transaction] To [Store Clerk]
+
+DENY INSERT, UPDATE, DELETE ON [Member] To [Store Clerk]
+
+-- b. must be able to view all transaction records (full details) but not modify them
+GRANT SELECT ON [Transaction] TO [Store Clerk]
+
+GRANT SELECT ON [Transaction_Details] TO [Store Clerk]
+
+-- c. must be able to add new membership data
+GRANT INSERT ON [Member] To [Store Clerk]
+
+-- d. must be able to view and update non confidential membership data
+
+GRANT SELECT, UPDATE ([Name], [Address], [Member_Status])
+ON [Member] TO [Store Clerk];
+
+-- e. should not be able to view any member’s confidential data
+
+DENY SELECT ([IC/Passport_No]) ON [Member] TO [Store Clerk];
+
+--- Database Administrator ---
+GRANT ALTER, CREATE, DROP TO [Database Administrators];
+
+--- Management ---
+-- a. Management staffs must be able to query all tables but not make any changes to it.  
+GRANT SELECT ON DATABASE:: [APU Sports Equipment] To [Management]
+-- b. Should not be able to view any member’s confidential data 
+ DENY SELECT ([IC/Passport_No]) ON [Member] TO [Management]
+
+---------------------------- Triggers ----------------------------
+-- (Wayne)
+-- Trigger to prevent item refund after 3 days and to delete relevant records of transaction if not referenced
+CREATE OR ALTER TRIGGER MemberRefundItem
+ON [Transaction_Details]
+INSTEAD OF 
+DELETE
+AS
+BEGIN
+    DECLARE @transactiondate DATE, @transactionid INT, @transactiondetailsid INT
+    
+    SELECT @transactionid = Transaction_ID,
+           @transactiondetailsid = Transaction_Details_ID
+    FROM DELETED
+    
+    SELECT @transactiondate = Transaction_Date
+    FROM [Transaction]
+    WHERE Transaction_ID = @transactionid
+    
+    IF DATEDIFF(DAY, @transactiondate, GETDATE()) > 4
+    BEGIN
+        PRINT 'Can only refund items within 3 days.'
+    END
+    ELSE
+    BEGIN
+        IF EXISTS (SELECT 1 FROM [Transaction_Details] WHERE Transaction_ID = @transactionid AND Transaction_Details_ID <> @transactiondetailsid)
+        BEGIN
+            DELETE FROM [Transaction_Details]
+            WHERE Transaction_Details_ID = @transactiondetailsid
+        END
+        ELSE
+        BEGIN
+            DELETE FROM [Transaction_Details]
+            WHERE Transaction_Details_ID = @transactiondetailsid
+            DELETE FROM [Transaction]
+            WHERE Transaction_ID = @transactionid
+        END
+    END
+END
+
+
+CREATE TRIGGER Prevent_login 
+ON ALL SERVER 
+FOR LOGON AS 
+BEGIN 
+    DECLARE @LoginName sysname 
+    SET @LoginName = ORIGINAL_LOGIN()
+
+    IF EXISTS (SELECT 1 FROM [Member] WHERE Member_ID = @LoginName AND Member_Status = 'Expired')
+    BEGIN
+        ROLLBACK; -- Disconnect the session for expired members
+        PRINT 'Your account has expired. Please contact the administrator for assistance.'
+    END
+END
+
+
+-- (VLIMMA)
+-- Validate Quantity &
+-- Trigger for member purchasing item accessing transaction_details only, automatically insert values 
+-- into transaction table and assign respective foreign key
+CREATE OR ALTER TRIGGER [ValidateStockQuantity]
+ON [Transaction_Details]
+INSTEAD OF 
+INSERT
+AS 
+BEGIN
+    DECLARE @quantity_in_stock INT, @quantity_ordered INT, 
+            @equipmentid VARCHAR(50), @transactionid INT,
+            @memberid INT
+
+    SELECT @transactionid = Transaction_ID,
+           @equipmentid = Equipment_ID, 
+           @quantity_ordered = Quantity, 
+           @memberid = USER_NAME()
+    FROM Inserted
+
+    SELECT @quantity_in_stock = Stock_Quantity
+    FROM Equipment
+    WHERE Equipment_ID = @equipmentid
+
+    IF @quantity_in_stock >= @quantity_ordered
+    BEGIN
+        -- Insert into the [Transaction] table with the current Member_ID
+        INSERT INTO [Transaction] ([Transaction_Date], [Member_ID])
+        VALUES (GETDATE(), @memberid)
+
+        -- Get the newly generated Transaction_ID
+        SET @transactionid = SCOPE_IDENTITY();
+
+        -- Insert into the [Transaction_Details] table with the generated Transaction_ID
+        INSERT INTO [Transaction_Details] (Transaction_ID, Equipment_ID, Quantity)
+        SELECT @transactionid, Equipment_ID, Quantity
+        FROM Inserted
+
+        UPDATE Equipment
+        SET Stock_Quantity = Stock_Quantity - @quantity_ordered
+        WHERE Equipment_ID = @equipmentid
+    END
+    ELSE
+    BEGIN
+        PRINT 'Equipment of: ' + @equipmentid + ' is not enough. Transaction is Rejected.'
+        PRINT 'Currently there is only ' + CONVERT(VARCHAR, @quantity_in_stock) + ' units of equipment'
+    END
+END
+
+-- Avoid accidentally Table deletion
+CREATE OR ALTER TRIGGER [Deletion Trigger] 
+ON DATABASE
+FOR DROP_TABLE
+AS
+BEGIN
+    PRINT 'You must disable Trigger [Deletion Trigger] to drop tables!'
+    ROLLBACK;
+END
+
+
 
