@@ -8,15 +8,22 @@ INSTEAD OF
 DELETE
 AS
 BEGIN
-    DECLARE @transactiondate DATE, @transactionid INT, @transactiondetailsid INT
+    DECLARE @transactiondate DATE, @transactionid INT, @transactiondetailsid INT,
+			@quantity_in_stock INT, @quantity_ordered INT, @equipmentid INT
     
     SELECT @transactionid = Transaction_ID,
-           @transactiondetailsid = Transaction_Details_ID
+           @transactiondetailsid = Transaction_Details_ID,
+		   @quantity_ordered = Quantity,
+		   @equipmentid = Equipment_ID
     FROM DELETED
     
     SELECT @transactiondate = Transaction_Date
     FROM [Transaction]
     WHERE Transaction_ID = @transactionid
+
+	SELECT @quantity_in_stock = Stock_Quantity
+    FROM Equipment
+    WHERE Equipment_ID = @equipmentid
     
     IF DATEDIFF(DAY, @transactiondate, GETDATE()) > 4
     BEGIN
@@ -27,7 +34,10 @@ BEGIN
         IF EXISTS (SELECT 1 FROM [Transaction_Details] WHERE Transaction_ID = @transactionid AND Transaction_Details_ID <> @transactiondetailsid)
         BEGIN
             DELETE FROM [Transaction_Details]
-            WHERE Transaction_Details_ID = @transactiondetailsid
+            WHERE Transaction_Details_ID = @transactiondetailsid	
+            UPDATE Equipment
+            SET Stock_Quantity = Stock_Quantity + @quantity_ordered
+            WHERE Equipment_ID = @equipmentid
         END
         ELSE
         BEGIN
@@ -35,6 +45,9 @@ BEGIN
             WHERE Transaction_Details_ID = @transactiondetailsid
             DELETE FROM [Transaction]
             WHERE Transaction_ID = @transactionid
+			UPDATE Equipment
+            SET Stock_Quantity = Stock_Quantity + @quantity_ordered
+            WHERE Equipment_ID = @equipmentid
         END
     END
 END
