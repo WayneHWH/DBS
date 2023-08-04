@@ -81,47 +81,56 @@ END
 -- into transaction table and assign respective foreign key
 CREATE OR ALTER TRIGGER [ValidateStockQuantity]
 ON [Transaction_Details]
-INSTEAD OF 
-INSERT
+INSTEAD OF INSERT
 AS 
 BEGIN
     DECLARE @quantity_in_stock INT, @quantity_ordered INT, 
             @equipmentid VARCHAR(50), @transactionid INT,
             @memberid INT
 
-    SELECT @transactionid = Transaction_ID,
-           @equipmentid = Equipment_ID, 
-           @quantity_ordered = Quantity, 
-           @memberid = USER_NAME()
+    -- Create a cursor to loop through the rows in the Inserted table
+    DECLARE cur_Inserted CURSOR FOR
+    SELECT Transaction_ID, Equipment_ID, Quantity, USER_NAME()
     FROM Inserted
 
-    SELECT @quantity_in_stock = Stock_Quantity
-    FROM Equipment
-    WHERE Equipment_ID = @equipmentid
+    OPEN cur_Inserted
+    FETCH NEXT FROM cur_Inserted INTO @transactionid, @equipmentid, @quantity_ordered, @memberid
 
-    IF @quantity_in_stock >= @quantity_ordered
+    WHILE @@FETCH_STATUS = 0
     BEGIN
-        -- Insert into the [Transaction] table with the current Member_ID
-        INSERT INTO [Transaction] ([Transaction_Date], [Member_ID])
-        VALUES (GETDATE(), @memberid)
-
-        -- Get the newly generated Transaction_ID
-        SET @transactionid = SCOPE_IDENTITY();
-
-        -- Insert into the [Transaction_Details] table with the generated Transaction_ID
-        INSERT INTO [Transaction_Details] (Transaction_ID, Equipment_ID, Quantity)
-        SELECT @transactionid, Equipment_ID, Quantity
-        FROM Inserted
-
-        UPDATE Equipment
-        SET Stock_Quantity = Stock_Quantity - @quantity_ordered
+        SELECT @quantity_in_stock = Stock_Quantity
+        FROM Equipment
         WHERE Equipment_ID = @equipmentid
+
+        IF @quantity_in_stock >= @quantity_ordered
+        BEGIN
+            -- Insert into the [Transaction] table with the current Member_ID
+            INSERT INTO [Transaction] ([Transaction_Date], [Member_ID])
+            VALUES (GETDATE(), @memberid)
+
+            -- Get the newly generated Transaction_ID
+            SET @transactionid = SCOPE_IDENTITY();
+
+            -- Insert into the [Transaction_Details] table with the generated Transaction_ID
+            INSERT INTO [Transaction_Details] (Transaction_ID, Equipment_ID, Quantity)
+            VALUES (@transactionid, @equipmentid, @quantity_ordered)
+
+            -- Update Equipment table with the new stock quantity
+            UPDATE Equipment
+            SET Stock_Quantity = Stock_Quantity - @quantity_ordered
+            WHERE Equipment_ID = @equipmentid
+        END
+        ELSE
+        BEGIN
+            PRINT 'Equipment of: ' + @equipmentid + ' is not enough. Transaction is Rejected.'
+            PRINT 'Currently there is only ' + CONVERT(VARCHAR, @quantity_in_stock) + ' units of equipment'
+        END
+
+        FETCH NEXT FROM cur_Inserted INTO @transactionid, @equipmentid, @quantity_ordered, @memberid
     END
-    ELSE
-    BEGIN
-        PRINT 'Equipment of: ' + @equipmentid + ' is not enough. Transaction is Rejected.'
-        PRINT 'Currently there is only ' + CONVERT(VARCHAR, @quantity_in_stock) + ' units of equipment'
-    END
+
+    CLOSE cur_Inserted
+    DEALLOCATE cur_Inserted
 END
 
 -- Avoid accidentally Table deletion
