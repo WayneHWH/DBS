@@ -146,6 +146,49 @@ BEGIN
     DEALLOCATE cur_Inserted
 END
 
+CREATE OR ALTER TRIGGER [UpdateValidateStockQuantity]
+ON [Transaction_Details]
+INSTEAD OF 
+UPDATE
+AS 
+BEGIN
+    DECLARE @quantity_in_stock INT, @quantity_ordered INT, 
+            @equipmentid VARCHAR(50), @transaction_details_id INT,
+            @difference INT,
+            @updated_quantity INT
+
+    SELECT @transaction_details_id = Transaction_Details_ID,
+           @equipmentid = Equipment_ID, 
+            @updated_quantity = Quantity
+    FROM Inserted
+
+    SELECT @quantity_ordered = Quantity
+    FROM DELETED
+
+    SET @difference = @updated_quantity - @quantity_ordered
+
+    SELECT @quantity_in_stock = Stock_Quantity
+    FROM Equipment
+    WHERE Equipment_ID = @equipmentid
+
+    IF @quantity_in_stock >= @updated_quantity
+    BEGIN
+        UPDATE Equipment
+        SET Stock_Quantity = Stock_Quantity - @difference
+        WHERE Equipment_ID = @equipmentid
+
+        UPDATE [Transaction_Details]
+        set Quantity = @updated_quantity
+        WHERE [Transaction_Details_ID] = @transaction_details_id
+
+    END
+    ELSE
+    BEGIN
+        PRINT 'Equipment of: ' + @equipmentid + ' is not enough. Transaction is Rejected.'
+        PRINT 'Currently there is only ' + CONVERT(VARCHAR, @quantity_in_stock) + ' units of equipment'
+    END
+END
+
 -- Avoid accidentally Table deletion
 CREATE OR ALTER TRIGGER [Deletion Trigger] 
 ON DATABASE
