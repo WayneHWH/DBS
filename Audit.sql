@@ -36,6 +36,8 @@ FOR SERVER AUDIT [DDLActivities_Audit]
 ADD (DATABASE_CHANGE_GROUP),
 --CREATE, ALTER, or DROP statement is executed on database objects
 ADD (DATABASE_OBJECT_CHANGE_GROUP),
+--This event is raised when a CREATE, ALTER, or DROP operation is performed on a schema
+ADD (SCHEMA_OBJECT_CHANGE_GROUP),
 --This event is raised when principals, such as users, are created, altered, or dropped from a database
 ADD (DATABASE_PRINCIPAL_CHANGE_GROUP)
 WITH (STATE=ON) 
