@@ -7,14 +7,16 @@ SELECT [LoginName], * FROM SysLogins WHERE [LoginName] = '100'
 
 USE [APU Sports Equipment]
 CREATE USER [100] FOR LOGIN [100]
+CREATE USER [104] FOR LOGIN [104]
 CREATE USER [101] WITHOUT LOGIN
-CREATE USER [102] WITHOUT LOGIN
+CREATE USER [104] WITHOUT LOGIN
 SELECT [name],* FROM sys.sysusers 
 
 CREATE ROLE [Member]
 ALTER ROLE [Member] ADD MEMBER [100]
 ALTER ROLE [Member] ADD MEMBER [101]
 ALTER ROLE [Member] ADD MEMBER [102]
+ALTER ROLE [Member] ADD MEMBER [104]
 
 --STORE CLERK ROLE
 CREATE USER [Clerk01] WITHOUT LOGIN
@@ -108,6 +110,8 @@ GRANT ALTER ON [Country] TO [Database Administrator];
 GRANT ALTER ON [Member] TO [Database Administrator];
 GRANT ALTER ON [Transaction] TO [Database Administrator];
 GRANT ALTER ON [Transaction_Details] TO [Database Administrator];
+
+DENY CREATE TABLE, CREATE VIEW, ALTER ON DATABASE::[APU Sports Equipment] TO [Member], [Store_Clerk], [Management];
 
 --- Management ---
 -- a. Management staffs must be able to query all tables but not make any changes to it.  

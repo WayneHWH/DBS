@@ -2,7 +2,8 @@
 ---------------------------- Member Details View for Member, Store Clerk, Management ----------------------------
 USE [APU Sports Equipment]
 CREATE OR ALTER VIEW [dbo].[Member Decrypted Full Details] WITH SCHEMABINDING AS
-SELECT Member_ID, CONVERT (varchar, DecryptByAsymKey(AsymKey_ID('AsymKey1'),[IC/Passport_No])) As [IC/Passport_No], [Name], [Address], Member_Status
+SELECT Member_ID, CONVERT (varchar, DecryptByAsymKey(AsymKey_ID('AsymKey1'),[IC/Passport_No])) 
+As [IC/Passport_No], [Name], [Address], Member_Status
 FROM [dbo].[Member]
 
 CREATE OR ALTER VIEW [dbo].[Member Encrypted Full Details] WITH SCHEMABINDING AS
@@ -13,6 +14,8 @@ GRANT SELECT ON [Member Decrypted Full Details] TO [Member]
 
 GRANT SELECT ON [Member Encrypted Full Details] TO [Store Clerk], [Management]
 
+SELECT * FROM [Member Decrypted Full Details]
+
 
 ------------------------------------RLS------------------------------------------------
 CREATE SCHEMA Security;
@@ -21,7 +24,11 @@ RETURNS TABLE WITH SCHEMABINDING
 AS
 	RETURN 
 	SELECT 1 AS fn_securitypredicate_result 
-	WHERE (@UserName = USER_NAME() AND IS_MEMBER('Member') = 1) OR USER_NAME() = 'dbo' OR IS_MEMBER('Store Clerk') = 1 OR IS_MEMBER('Database Administrator') = 1 OR IS_MEMBER('Management') = 1
+	WHERE (@UserName = USER_NAME() AND IS_MEMBER('Member') = 1) 
+	OR USER_NAME() = 'dbo' 
+	OR IS_MEMBER('Store Clerk') = 1 
+	OR IS_MEMBER('Database Administrator') = 1 
+	OR IS_MEMBER('Management') = 1
 
 
 CREATE SECURITY POLICY [MemberTablePolicy]   

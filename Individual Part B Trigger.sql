@@ -88,7 +88,7 @@ END
 
 
 
--- (VLIMMA)
+-- (Wi Liam)
 -- Validate Quantity &
 -- Trigger for member purchasing item accessing transaction_details only, automatically insert values 
 -- into transaction table and assign respective foreign key
@@ -146,6 +146,8 @@ BEGIN
     DEALLOCATE cur_Inserted
 END
 
+
+--Validate and Update Stock Quantity When Member Change Item Quantity
 CREATE OR ALTER TRIGGER [UpdateValidateStockQuantity]
 ON [Transaction_Details]
 INSTEAD OF 
@@ -190,11 +192,61 @@ BEGIN
 END
 
 -- Avoid accidentally Table deletion
-CREATE OR ALTER TRIGGER [Deletion Trigger] 
+CREATE or ALTER trigger [EquipmentDeletionTrigger]
+ON [Equipment]
+FOR DELETE 
+as begin 
+    PRINT 'DELETION ON Equipment table is not allowed! Please disable [EquipmentDeletionTrigger] to perform deletion'
+	rollback;
+END;
+GO
+
+
+-- (Kay Zen)
+--Trigger to prevent accidental deletion on [Transaction], [Transaction_Details], [Country], [Category]
+CREATE OR ALTER TRIGGER PreventDeleteTransaction
+ON [Transaction]
+INSTEAD OF DELETE
+AS
+BEGIN
+    Print('Please disable this trigger before performing deletion.')
+    Rollback
+END
+
+CREATE OR ALTER TRIGGER PreventDeleteTransactionDetails
+ON [Transaction_Details]
+FOR DELETE
+AS
+BEGIN
+    Print('Please disable this trigger before performing deletion.')
+    Rollback
+END
+
+Delete from [Transaction_Details] Where Transaction_ID =200
+
+CREATE OR ALTER TRIGGER PreventDeleteCountry
+ON [Country]
+INSTEAD OF DELETE
+AS
+BEGIN
+    Print('Please disable this trigger before performing deletion.')
+    Rollback
+END
+
+CREATE OR ALTER TRIGGER PreventDeleteCategory
+ON [Category]
+INSTEAD OF DELETE
+AS
+BEGIN
+    Print('Please disable this trigger before performing deletion.')
+    Rollback
+END
+
+
+--Prevent dropping table
+CREATE OR ALTER TRIGGER [PreventDropTable] 
 ON DATABASE
 FOR DROP_TABLE
 AS
-BEGIN
-    PRINT 'You must disable Trigger [Deletion Trigger] to drop tables!'
-    ROLLBACK;
-END
+PRINT 'You must disable this trigger to drop tables!'
+ROLLBACK;
