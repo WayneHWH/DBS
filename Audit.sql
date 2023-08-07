@@ -28,14 +28,15 @@ WHERE server_principal_name ='100'
 CREATE SERVER AUDIT DDLActivities_Audit TO FILE ( FILEPATH = 'C:\Temp' ); 
 -- Enable the server audit.  
 ALTER SERVER AUDIT DDLActivities_Audit 
-WITH (STATE = ON)  
+WITH (STATE = ON) 
+
+ALTER SERVER AUDIT SPECIFICATION [DDLActivities_Audit_Specification]
+WITH (STATE = OFF) 
 
 CREATE SERVER AUDIT SPECIFICATION [DDLActivities_Audit_Specification] 
 FOR SERVER AUDIT [DDLActivities_Audit] 
 --This event is raised when a database is created, altered, or dropped. 
 ADD (DATABASE_CHANGE_GROUP),
---CREATE, ALTER, or DROP statement is executed on database objects
-ADD (DATABASE_OBJECT_CHANGE_GROUP),
 --This event is raised when a CREATE, ALTER, or DROP operation is performed on a schema
 ADD (SCHEMA_OBJECT_CHANGE_GROUP),
 --This event is raised when principals, such as users, are created, altered, or dropped from a database
@@ -45,7 +46,6 @@ WITH (STATE=ON)
 DECLARE @AuditFilePath VARCHAR(8000);
 Select @AuditFilePath = audit_file_path 
 From sys.dm_server_audit_status where name = 'DDLActivities_Audit'
---select * from sys.fn_get_audit_file(@AuditFilePath,default,default)
 select event_time, database_name, database_principal_name, object_name, statement, action_id
 from sys.fn_get_audit_file(@AuditFilePath,default,default)
 
