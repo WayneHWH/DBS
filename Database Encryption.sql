@@ -6,6 +6,8 @@ SELECT Member_ID, CONVERT (varchar, DecryptByAsymKey(AsymKey_ID('AsymKey1'),[IC/
 As [IC/Passport_No], [Name], [Address], Member_Status
 FROM [dbo].[Member]
 
+GRANT SELECT ON [Member Decrypted Full Details] TO [Member]
+
 CREATE OR ALTER VIEW [dbo].[Member Encrypted Full Details] WITH SCHEMABINDING AS
 SELECT Member_ID, [IC/Passport_No], [Name], [Address], Member_Status
 FROM [dbo].[Member]
@@ -59,7 +61,7 @@ CREATE DATABASE ENCRYPTION KEY
 WITH ALGORITHM = AES_128
 ENCRYPTION BY SERVER CERTIFICATE CertMasterDB;
 go
-ALTER DATABASE [APU Sports Equipment1]
+ALTER DATABASE [APU Sports Equipment]
 SET ENCRYPTION ON;
 
 --check database encryption status

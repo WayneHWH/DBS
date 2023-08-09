@@ -56,9 +56,6 @@ CREATE SERVER AUDIT UserPermission_Audit TO FILE ( FILEPATH = 'C:\Temp' );
 ALTER SERVER AUDIT UserPermission_Audit 
 WITH (STATE = ON) 
 
-ALTER SERVER AUDIT SPECIFICATION [UserPermission_Audit_Specification] 
-WITH (STATE = OFF) 
-
 CREATE SERVER AUDIT SPECIFICATION [UserPermission_Audit_Specification] 
 FOR SERVER AUDIT UserPermission_Audit 
 --This event is raised whenever a GRANT, REVOKE, or DENY is issued for a statement permission by any principal in SQL Server 
@@ -101,5 +98,5 @@ FROM sys.dm_server_audit_status
 WHERE NAME = 'AllTables_DML'
 SELECT action_id, event_time, DATABASE_NAME, database_principal_name, object_name, statement
 FROM sys.fn_get_audit_file(@AuditFilePath,default,default)
-WHERE DATABASE_NAME = 'APU Sports Equipment'
+WHERE DATABASE_NAME = 'APU Sports Equipment' AND database_principal_name = '101'
 
